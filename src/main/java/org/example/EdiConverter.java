@@ -1,8 +1,5 @@
 package org.example;
 
-import io.xlate.edi.stream.EDIInputFactory;
-import io.xlate.edi.stream.EDIStreamEvent;
-import io.xlate.edi.stream.EDIStreamReader;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -17,7 +14,7 @@ import java.util.List;
 @Service
 public class EdiConverter {
 
-    @Value("${edi.output.path:C:/Users/35311/Desktop/EDI852Converter/data/output/}")
+    @Value("${edi.output.path:C:/Users/HP/IdeaProjects/EDI852Converter/data/output/}")
     private String outputDirPath;
 
     public void processFile(File inputFile) {
@@ -29,10 +26,8 @@ public class EdiConverter {
         }
 
         Path outputPath = Paths.get(outputDirPath, inputFile.getName().replaceAll("(?i)\\.(edi|txt)$", ".csv"));
-        EDIInputFactory factory = EDIInputFactory.newFactory();
 
-        try (InputStream is = new FileInputStream(inputFile);
-             EDIStreamReader reader = factory.createEDIStreamReader(is);
+        try (BufferedReader br = new BufferedReader(new FileReader(inputFile));
              PrintWriter pw = new PrintWriter(Files.newBufferedWriter(outputPath, StandardCharsets.UTF_8))) {
 
             // Header for CSV - Includes all requested segments
@@ -44,34 +39,47 @@ public class EdiConverter {
             String senderName = "N/A", receiverName = "N/A";
             String productId = "N/A", upc = "N/A", activityCode = "N/A", price = "N/A";
 
-            while (reader.hasNext()) {
-                EDIStreamEvent event = reader.next();
+            String line;
+            while ((line = br.readLine()) != null) {
+                line = line.trim();
+                if (line.isEmpty()) continue;
 
-                if (event == EDIStreamEvent.START_SEGMENT) {
-                    String segmentId = reader.getText();
-                    List<String> elements = readSegment(reader);
+                // Split by the delimiter (handle the segment terminator ~)
+                String[] segmentParts = line.split("~");
+                
+                for (String segment : segmentParts) {
+                    if (segment.isEmpty()) continue;
+
+                    // Split by element delimiter * to get fields
+                    String[] elements = segment.split("\\*");
+                    if (elements.length == 0) continue;
+
+                    String segmentId = elements[0];
 
                     switch (segmentId) {
-                        case "ISA" -> isaCtrl = getVal(elements, 13);
-                        case "GS"  -> gsSender = getVal(elements, 2);
-                        case "XQ"  -> reportDate = getVal(elements, 2);
+                        case "ISA" -> isaCtrl = getVal(elements, 13); // ISA13 is at position 13 (0-indexed)
+                        case "GS"  -> gsSender = getVal(elements, 2);  // GS02 is at position 2
+                        case "XQ"  -> reportDate = getVal(elements, 2); // XQ02 is at position 2
                         case "N9"  -> {
+                            // N901 is at position 1, N902 is at position 2
                             if ("IA".equals(getVal(elements, 1))) refIa = getVal(elements, 2);
                         }
                         case "N1" -> {
+                            // N101 is at position 1, N102 is at position 2
                             String role = getVal(elements, 1);
                             if ("FR".equals(role)) senderName = getVal(elements, 2);
                             else if ("TO".equals(role)) receiverName = getVal(elements, 2);
                         }
                         case "LIN" -> {
-                            productId = getVal(elements, 3); // Product ID (Buyer Part Number)
-                            upc = getVal(elements, 5);       // UPC Code
+                            // LIN03 is at position 3, LIN05 is at position 5
+                            productId = getVal(elements, 3);
+                            upc = getVal(elements, 5);
                         }
-                        case "ZA" -> activityCode = getVal(elements, 1);
-                        case "CTP" -> price = getVal(elements, 3);
+                        case "ZA" -> activityCode = getVal(elements, 1); // ZA01 is at position 1
+                        case "CTP" -> price = getVal(elements, 3); // CTP03 is at position 3
                         case "SDQ" -> {
-                            // SDQ contains pairs: SDQ03=Store, SDQ04=Qty, SDQ05=Store, SDQ06=Qty...
-                            for (int i = 3; i < elements.size(); i += 2) {
+                            // SDQ contains: SDQ01=Unit, SDQ02=Unit, SDQ03=Store, SDQ04=Qty, SDQ05=Store, SDQ06=Qty...
+                            for (int i = 3; i < elements.length; i += 2) {
                                 String storeId = getVal(elements, i);
                                 String qty = getVal(elements, i + 1);
 
@@ -90,21 +98,7 @@ public class EdiConverter {
         }
     }
 
-    private List<String> readSegment(EDIStreamReader reader) throws Exception {
-        List<String> elements = new ArrayList<>();
-        while (reader.hasNext()) {
-            EDIStreamEvent event = reader.next();
-            if (event == EDIStreamEvent.ELEMENT_DATA) {
-                elements.add(reader.getText());
-            } else if (event == EDIStreamEvent.END_SEGMENT) {
-                break;
-            }
-        }
-        return elements;
-    }
-
-    private String getVal(List<String> elements, int index) {
-        int listIndex = index - 1;
-        return (listIndex >= 0 && listIndex < elements.size()) ? elements.get(listIndex) : "N/A";
+    private String getVal(String[] elements, int index) {
+        return (index >= 0 && index < elements.length && !elements[index].isEmpty()) ? elements[index] : "N/A";
     }
 }

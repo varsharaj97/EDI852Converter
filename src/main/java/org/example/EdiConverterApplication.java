@@ -5,9 +5,6 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ApplicationContext;
 
 import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 
 @SpringBootApplication
 public class EdiConverterApplication {
@@ -19,7 +16,7 @@ public class EdiConverterApplication {
         EdiConverter converter = context.getBean(EdiConverter.class);
 
         // Path to input EDI file
-        String inputPath = "C:/Users/35311/Desktop/EDI852Converter/data/input/sample_852.edi";
+        String inputPath = "C:/Users/HP/IdeaProjects/EDI852Converter/data/input/kk_edi852.edi";
         File inputFile = new File(inputPath);
 
         if (inputFile.exists()) {
@@ -31,4 +28,3 @@ public class EdiConverterApplication {
         }
     }
 }
-
