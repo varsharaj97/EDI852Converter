@@ -9,14 +9,14 @@ import java.util.List;
 @Service
 public class EdiConverter {
 
-    public List<String> processFile(File inputFile) {
+    public List<String> processFile(InputStream inputFile) {
         List<String> outputLines = new ArrayList<>();
         // File-level header variables
         String interchange = "N/A", groupId = "N/A", fileId = "N/A", reportDate = "N/A", sender = "N/A", receiver = "N/A", vendorId = "N/A";
         // Transactional data rows
         List<String[]> rows = new ArrayList<>();
 
-        try (BufferedReader br = new BufferedReader(new FileReader(inputFile))) {
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(inputFile))) {
             String line;
             String refNum = "N/A", upc = "N/A", activity = "N/A", price = "N/A";
             String storeId = "N/A", quantity = "N/A";
